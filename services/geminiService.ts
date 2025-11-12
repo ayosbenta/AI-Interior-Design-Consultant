@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Modality } from "@google/genai";
 import { ChatMessage, ChatMessageSender, GroundingSource } from '../types';
 
@@ -24,7 +23,7 @@ export async function reimagineRoom(
 ): Promise<string> {
   const imagePart = fileToGenerativePart(base64Image, mimeType);
   const textPart = {
-    text: `Generate a photorealistic image of this room redesigned in a ${style} interior design style. Maintain the original room's structure, windows, and layout as much as possible, but completely transform the furniture, colors, and decor to fit the new style.`,
+    text: `Redesign this room in a photorealistic ${style} style. Keep the original room layout and structure.`,
   };
 
   const response = await ai.models.generateContent({
@@ -35,13 +34,16 @@ export async function reimagineRoom(
     },
   });
   
-  // FIX: Iterate through parts to find the first one with image data for robustness.
   for (const part of response.candidates?.[0]?.content?.parts || []) {
     if (part.inlineData) {
       return part.inlineData.data;
     }
   }
-  throw new Error("No image was generated. The response may have been blocked.");
+
+  if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+    throw new Error("The image generation was blocked due to safety policies. Please try a different image or style.");
+  }
+  throw new Error("No image was generated. The response may have been blocked or the model didn't return an image.");
 }
 
 
@@ -51,7 +53,7 @@ export async function editImage(
   prompt: string
 ): Promise<string> {
     const imagePart = fileToGenerativePart(base64Image, mimeType);
-    const textPart = { text: prompt };
+    const textPart = { text: `Edit the provided image of a room based on the following instruction: "${prompt}". The output should be a photorealistic image.` };
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
@@ -61,20 +63,22 @@ export async function editImage(
         },
     });
 
-    // FIX: Iterate through parts to find the first one with image data for robustness.
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
           return part.inlineData.data;
       }
     }
-    throw new Error("Could not edit the image. The response may have been blocked.");
+    
+    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+        throw new Error("The image edit was blocked due to safety policies. Please try a different request.");
+    }
+    throw new Error("Could not edit the image. The response may have been blocked or the model didn't return an image.");
 }
 
 
 export async function getChatResponse(
   history: ChatMessage[]
 ): Promise<{ text: string, sources: GroundingSource[] }> {
-    // FIX: Map chat history to the format expected by the Gemini API and pass it to maintain conversation context.
     const geminiHistory = history.slice(0, -1).map(msg => {
       if (msg.sender === ChatMessageSender.USER) {
         return { role: 'user' as const, parts: [{ text: msg.text }] };
@@ -105,7 +109,6 @@ export async function getChatResponse(
     const sources: GroundingSource[] = [];
     if (groundingChunks) {
         for (const chunk of groundingChunks) {
-            // FIX: Ensure web chunk and URI exist, and provide a fallback for the title.
             if (chunk.web && chunk.web.uri) {
                 sources.push({ title: chunk.web.title || chunk.web.uri, uri: chunk.web.uri });
             }
