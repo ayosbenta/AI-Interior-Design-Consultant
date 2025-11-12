@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import ImageUploader from './components/ImageUploader';
 import StyleCarousel from './components/StyleCarousel';
@@ -7,6 +6,7 @@ import ChatInterface from './components/ChatInterface';
 import { DesignStyle, ChatMessage, ChatMessageSender } from './types';
 import { reimagineRoom, editImage, getChatResponse } from './services/geminiService';
 import { IMAGE_EDIT_KEYWORDS } from './constants';
+import { DownloadIcon } from './components/icons/Icons';
 
 // Helper to convert file to base64
 const fileToDataUrl = (file: File): Promise<{ base64: string; mimeType: string }> => {
@@ -129,6 +129,17 @@ export default function App() {
     }
   }, [chatMessages, currentGeneratedImage, originalImage, selectedStyle]);
 
+  const handleDownload = useCallback(() => {
+    if (!currentGeneratedImage) return;
+    const link = document.createElement('a');
+    link.href = currentGeneratedImage;
+    const styleName = selectedStyle?.name.replace(/\s+/g, '-') || 'design';
+    link.download = `reimagined-${styleName}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [currentGeneratedImage, selectedStyle]);
+
 
   return (
     <div className="bg-slate-100 min-h-screen w-full flex flex-col items-center font-sans">
@@ -140,7 +151,7 @@ export default function App() {
           <main className="flex-1 w-full p-4 md:p-8 flex flex-col items-center">
             {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">{error}</div>}
             
-            <div className="w-full max-w-5xl aspect-[4/3] bg-slate-200 rounded-lg shadow-lg flex items-center justify-center mb-4">
+            <div className="relative w-full max-w-5xl aspect-[4/3] bg-slate-200 rounded-lg shadow-lg flex items-center justify-center mb-4">
               {isLoading && !currentGeneratedImage && (
                 <div className="text-center">
                    <svg className="animate-spin mx-auto h-10 w-10 text-indigo-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -153,6 +164,16 @@ export default function App() {
               )}
               {currentGeneratedImage && originalImage && (
                 <ImageComparator originalImage={originalImage.url} generatedImage={currentGeneratedImage} />
+              )}
+              {currentGeneratedImage && (
+                <button
+                  onClick={handleDownload}
+                  className="absolute bottom-4 right-4 bg-white/80 text-slate-800 font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75 backdrop-blur-sm transition-all duration-200 flex items-center gap-2"
+                  aria-label="Download generated image"
+                >
+                  <DownloadIcon className="w-5 h-5" />
+                  <span>Download</span>
+                </button>
               )}
               {!isLoading && !currentGeneratedImage && (
                  <div className="text-center p-8">
